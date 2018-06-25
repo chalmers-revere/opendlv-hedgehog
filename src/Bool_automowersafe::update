@@ -1,0 +1,337 @@
+bool AutomowerSafe::update(ros::Duration dt)
+{
+    if (serialPortState == AM_SP_STATE_ERROR)
+    {
+        if (!serialComTest)
+        {
+            nextAutomowerInitTime = ros::Time::now() + ros::Duration(2.0);  // only wait a short time
+            ROS_WARN("Communication error. New try in 2 seconds");
+        }
+        else
+        {
+            //In this case we want a long pause to see the automower behaviour
+            nextAutomowerInitTime = ros::Time::now() + ros::Duration(30);   // Results in waiting in 30 second
+            ROS_WARN("SerialComTest:   Communication error. New try in 30 seconds");
+        }
+        serialPortState = AM_SP_STATE_OFFLINE;
+    }
+
+    if (serialPortState == AM_SP_STATE_OFFLINE)
+    {
+
+        if (ros::Time::now() > nextAutomowerInitTime)
+        {
+            serialPortState = AM_SP_STATE_INITIALISING;
+            if (initAutomowerBoard())
+            {
+
+                ROS_INFO("Automower::Serial port ONLINE!");
+                serialPortState = AM_SP_STATE_ONLINE;
+            }
+            else
+            {
+                serialPortState = AM_SP_STATE_OFFLINE;
+                nextAutomowerInitTime = ros::Time::now() + ros::Duration(10);  // retry every 10 second
+                ROS_WARN("Automower::Failed to contact Mower board - SLEEPING?");
+                ROS_WARN("New try in 10 seconds");
+            }
+        }
+        else
+        {
+            ROS_INFO("WAITING");
+        }
+
+    }
+
+    if (serialPortState == AM_SP_STATE_ONLINE)
+    {
+        ROS_INFO("Automower::Serial port connected!");
+        serialPortState = AM_SP_STATE_CONNECTED;
+
+
+        if (requestedState == AM_STATE_MANUAL)
+        {
+            eventQueue->raiseEvent("/MANUAL");
+        }
+        else if (requestedState == AM_STATE_RANDOM)
+        {
+            eventQueue->raiseEvent("/RANDOM");
+        }
+    }
+
+    if (serialComTest)
+    {
+        doSerialComTest();
+        return true;
+    }
+
+    ros::Time current_time = ros::Time::now();
+
+    timeSinceWheelSensor += dt;
+    timeSinceEncoderSensor += dt;
+    timeSinceRegulator += dt;
+    timeSinceState += dt;
+    timeSinceLoop += dt;
+    timeSincePitchRoll += dt;
+    timeSincebattery += dt;
+    timeSinceGPS += dt;
+    timeSinceStatus += dt;
+
+    bool newData = false;
+
+    // Communication with mower if serial port connected
+    if (serialPortState == AM_SP_STATE_CONNECTED )
+    {
+        if (isTimeOut(timeSinceWheelSensor, wheelSensorFreq))
+        {
+            getWheelData();
+//            double rate = 1.0/timeSinceWheelSensor.toSec();
+//            DEBUG_LOG("Actual Wheelspeed rate: " << rate);
+            timeSinceWheelSensor *= 0;
+            newData = true;
+
+        }
+        if (isTimeOut(timeSinceEncoderSensor, encoderSensorFreq))
+        {
+            getEncoderData();
+//            double rate = 1.0/timeSinceEncoderSensor.toSec();
+//            DEBUG_LOG("Actual encoderSensor rate: " << rate);
+            timeSinceEncoderSensor *= 0;
+            newData = true;
+
+        }
+        if (isTimeOut(timeSinceRegulator, regulatorFreq))
+        {
+            if (regulateBySpeed)
+            {
+                regulateVelocity();
+//                double rate = 1.0/timeSinceRegulator.toSec();
+//                DEBUG_LOG("Actual Regulation rate: " << rate);
+                timeSinceRegulator *= 0;
+                newData = true;
+            }
+            else
+            {
+                setPower();
+//                double rate = 1.0/timeSinceRegulator.toSec();
+//                DEBUG_LOG("Actual setPower rate: " << rate);
+                timeSinceRegulator *= 0;
+                newData = true;
+            }
+        }
+        if (isTimeOut(timeSinceStatus, sensorStatusCheckFreq))
+        {
+            getSensorStatus();
+            timeSinceStatus *= 0;
+            newData = true;
+        }
+        if (isTimeOut(timeSinceState, stateCheckFreq))
+        {
+            getStateData();
+            timeSinceState *= 0;
+            newData = true;
+        }
+        if (isTimeOut(timeSinceLoop, loopSensorFreq))
+        {
+            getLoopData();
+            timeSinceLoop *= 0;
+            newData = true;
+        }
+        if (m_PitchAndRollFromAccelerometer &&
+                 isTimeOut(timeSincePitchRoll, pitchRollFreq))
+        {
+            getPitchAndRoll();
+            timeSincePitchRoll *= 0;
+            newData = true;
+        }
+        if (isTimeOut(timeSincebattery, batteryCheckFreq))
+        {
+            getBatteryData();
+            timeSincebattery *= 0;
+            newData = true;
+        }
+        if (isTimeOut(timeSinceGPS, GPSCheckFreq))
+        {
+            getGPSData();
+            timeSinceGPS *= 0;
+            newData = true;
+        }
+
+        if (newSound)
+        {
+            hcp_tResult result; 
+            const char* msg = soundCmd;
+            if (!sendMessage(msg, sizeof(msg), result))
+            {
+                eventQueue->raiseEvent("/COM_ERROR");
+            }
+            newSound = false;
+        }
+
+        handleCollisionInjections(dt);
+    }
+
+    if (!newData)
+    {
+        return true;
+    }
+
+    if (timeSincePitchRoll.toSec() < 1e-6)
+    {
+        if (publishEuler)
+        {
+            geometry_msgs::Vector3Stamped tmp;
+            tmp.header.stamp = ros::Time::now();
+            tmp.vector.x = m_roll;
+            tmp.vector.y = m_pitch;
+            tmp.vector.z = 0;
+            euler_pub.publish(tmp);
+        }
+    }
+
+    if (timeSinceWheelSensor.toSec() < 1e-6)
+    {
+        motorFeedbackDiffDrive_pub.publish(motorFeedbackDiffDrive);
+    }
+
+    if (timeSinceEncoderSensor.toSec() < 1e-6)
+    {
+
+        // Get the odo data and convert to meters
+        int deltaLeftPulses = leftPulses - lastLeftPulses;
+        int deltaRightPulses = rightPulses - lastRightPulses;
+        lastLeftPulses = leftPulses;
+        lastRightPulses = rightPulses;
+
+        double leftDist = -deltaLeftPulses * WHEEL_METER_PER_TICK;
+        double rightDist = deltaRightPulses * WHEEL_METER_PER_TICK;
+
+        // handle ZEROING of counters from mower?
+        if ((fabs(leftDist) > 1.0) || (fabs(rightDist) > 1.0))
+        {
+            DEBUG_LOG("Automower::Strange distance? - zeroint counters from mower");
+            // ROS_INFO("Automower::Strange distance? => ld = %f, rd = %f", leftDist, rightDist);
+            leftDist = 0;
+            rightDist = 0;
+        }
+
+        // ROS_INFO("Automower::ld = %f, rd = %f", leftDist, rightDist);
+
+        double distance = (rightDist + leftDist) / 2.0;
+        double delta_yaw = -(leftDist - rightDist) / AUTMOWER_WHEEL_BASE_WIDTH;
+
+        yaw = yaw + delta_yaw;
+
+        double vYaw = (yaw - last_yaw) / dt.toSec();
+        last_yaw = yaw;
+
+        double xdist = distance * cos(yaw);
+        double ydist = distance * sin(yaw);
+
+        double vx = distance / dt.toSec();
+        double vy = 0.0;
+
+        xpos = xpos + xdist;
+        ypos = ypos + ydist;
+
+        // ROS_INFO("Automower::pos: dt=%f xpos=%f, ypos=%f", (dt.toSec()), (float)xpos, (float)ypos);
+
+        // Set position into the pose
+        robot_pose.pose.position.x = xpos;
+        robot_pose.pose.position.y = ypos;
+
+
+		// Calculate the orientation
+        tf::Quaternion qyaw;
+
+        if (m_PitchAndRollFromAccelerometer)
+        {
+            qyaw = tf::createQuaternionFromRPY(m_roll,m_pitch, yaw); 
+        }
+        else
+        {
+            qyaw = tf::createQuaternionFromYaw(yaw);
+        }
+
+        // Set orientation into the pose
+
+        robot_pose.pose.orientation.x = qyaw.x();
+        robot_pose.pose.orientation.y = qyaw.y();
+        robot_pose.pose.orientation.z = qyaw.z();
+        robot_pose.pose.orientation.w = qyaw.w();
+
+
+        // Publish wheel encoders
+
+        encoder.lwheel = leftDist; //current_lv;
+        encoder.rwheel = rightDist; //current_rv;
+        encoder.lwheelAccum = leftPulses;
+        encoder.rwheelAccum = rightPulses;
+        encoder.lticks = current_lv * 1000.0; //deltaLeftPulses;
+        encoder.rticks = current_rv * 1000.0; //deltaRightPulses;
+
+        // std::cout << "LeftDist: " << leftDist << " RightDist: " << rightDist;
+        // std::cout << " LeftAccum: " << (int)leftPulses << " RightAccum: " << (int)rightPulses << std::endl;
+        encoder_pub.publish(encoder);
+        current_pub.publish(wheelCurrent);
+        wheelPower_pub.publish(wheelPower);
+
+        // Calculate and Send the TF
+        if (publishTf)
+        {
+            // Calculate the TF from the pose...
+			transform.setOrigin(
+						tf::Vector3(robot_pose.pose.position.x, robot_pose.pose.position.y, robot_pose.pose.position.z));
+			tf::Quaternion q;
+			tf::quaternionMsgToTF(robot_pose.pose.orientation, q);
+			transform.setRotation(q);
+
+            br.sendTransform(tf::StampedTransform(transform, current_time, "odom", "base_link"));
+        }
+
+        // Odometry message over ROS
+        nav_msgs::Odometry odom;
+        odom.header.stamp = current_time;
+        odom.header.frame_id = "odom";
+        odom.child_frame_id = "base_link";
+
+        // Set the position
+        odom.pose.pose.position.x = robot_pose.pose.position.x;
+        odom.pose.pose.position.y = robot_pose.pose.position.y;
+        odom.pose.pose.position.z = robot_pose.pose.position.z;
+        odom.pose.pose.orientation = robot_pose.pose.orientation;
+
+        // Set the velocity
+        odom.twist.twist.linear.x = vx;
+        odom.twist.twist.linear.y = vy;
+        odom.twist.twist.angular.z = vYaw;
+
+        // Publish the message
+        odom_pub.publish(odom);
+
+        // Publish the pose
+        pose_pub.publish(robot_pose);
+    }
+
+    if (timeSinceLoop.toSec() < 1e-6)
+    {
+        // Publish the loop
+        loop.header.stamp = current_time;
+        loop_pub.publish(loop);
+    }
+    if (timeSinceState.toSec() < 1e-6)
+    {
+        // Publish the sensorStatus
+        if (serialPortState != AM_SP_STATE_CONNECTED)
+        {
+            // We are offline (i.e. standby?)
+            sensorStatus.operationalMode = AM_OP_MODE_OFFLINE;
+        }
+
+        sensorStatus.header.stamp = current_time;
+        sensorStatus.header.frame_id = "odom";
+        sensorStatus_pub.publish(sensorStatus);
+    }
+
+    return true;
+}
