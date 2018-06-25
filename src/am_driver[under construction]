@@ -6,8 +6,9 @@
  */
 
 #include "am_driver_safe/automower_safe.h"
-#include <tf/transform_datatypes.h>
+#include <tf/transform_datatypes.h> //vad?
 
+//including normal cpp headers
 #include <math.h>
 #include <termios.h>
 #include <fcntl.h>
@@ -18,24 +19,25 @@
 #define DEG2RAD(DEG) ((DEG) * ((M_PI) / (180.0)))
 
 
-// OPERATIONAL MODES (i.e. published in SensorStatus.operationalMode)
+// OPERATIONAL MODES (i.e. published in SensorStatus.operationalMode) used in a switch loop rows 1225-1255/R
 #define AM_OP_MODE_OFFLINE (0x0000)
 #define AM_OP_MODE_CONNECTED_MANUAL (0x0001)
 #define AM_OP_MODE_CONNECTED_RANDOM (0x0002)
 
-// Serial port states
+// Serial port states (checking if the serialport is connected to the device. changes value of the variable serialPortState, declared in the header file /R)
 #define AM_SP_STATE_OFFLINE (0)
 #define AM_SP_STATE_ONLINE (1)
 #define AM_SP_STATE_CONNECTED (2)
 #define AM_SP_STATE_INITIALISING (3)
 #define AM_SP_STATE_ERROR (4)
 
+//never used in cpp./R
 #define AM_POWER_INCDEC (1)
 #define AM_POWER_THRESHOLD (0.1)
 
 
-// Sensor states
-#define HVA_SS_HMB_CTRL 0x0001
+// Sensor states (not necessary for now /R)
+/*#define HVA_SS_HMB_CTRL 0x0001
 #define HVA_SS_OUTSIDE 0x0002
 #define HVA_SS_COLLISION 0x0004
 #define HVA_SS_LIFTED 0x0008
@@ -46,17 +48,17 @@
 #define HVA_SS_CFG_NEEDED 0x0100
 #define HVA_SS_DISC_ON 0x0200
 #define HVA_SS_LOOP_ON 0x0400
-#define HVA_SS_CHARGING 0x0800
+#define HVA_SS_CHARGING 0x0800 */
 
 
-// Mower internal modes
+// Mower internal modes (not used in cpp /R)
 #define IMOWERAPP_MODE_AUTO (0)
 #define IMOWERAPP_MODE_MANUAL (1)
 #define IMOWERAPP_MODE_HOME (2)
 #define IMOWERAPP_MODE_DEMO (3)
 
 
-// Mower internal states
+// Mower internal states (declared in sensorstatus.msg, used in switch as different cases for variable state (=result.parameters[0].value.u8 (VA?)/R)
 #define IMOWERAPP_STATE_OFF              0
 #define IMOWERAPP_STATE_WAIT_SAFETY_PIN  1
 #define IMOWERAPP_STATE_STOPPED          2
@@ -68,13 +70,13 @@
 #define IMOWERAPP_STATE_ERROR            8
 
 
-//#define DEBUG_LOG(X)  std::cout << X << std::endl;
+//#define DEBUG_LOG(X)  std::cout << X << std::endl; debug stuff/R
 #define DEBUG_LOG(X)
 
 #define RADIANS_PER_DEGREE (3.14159/180.0)
 
 
-
+//https://en.cppreference.com/w/cpp/language/namespace about namespaces /R
 namespace Husqvarna
 {
 
@@ -84,8 +86,8 @@ extern "C"
 #endif
 
 //
-// For HCP Runtime environment
-//
+// For HCP Runtime environment, information about each in hcp_runtime.h under include/hcp. chech typedef struct hcp_tHost
+// All are already defined fucktions in cpp (malloc, free etc.)
 static void* _malloc(hcp_Size_t size, void* ctx) {
     return malloc(size);
 }
@@ -101,7 +103,7 @@ static void* _memcpy(void* dest, const void* source, hcp_Size_t size, void*  ctx
 static void* _memset(void* dest, hcp_Int value, hcp_Size_t len, void*  ctx) {
     return memset(dest, value, len);
 };
-
+//codec==some github stuff
 hcp_Int compareCodec(void* codec, void* name, void* pState) {
     tCodec* c = (tCodec*)codec;
     return hcp_szStrCmp(c->name, (const hcp_szStr)name) == 0;
@@ -118,12 +120,12 @@ hcp_Boolean isCodec(void* codec, void* pState) {
 
 
 
-
+//class declared in header with all variables. ROS the whole shit /R
 AutomowerSafe::AutomowerSafe(const ros::NodeHandle& nodeh, decision_making::RosEventQueue* eq)
 {
     // Init attributes
-    nh = nodeh;
-    eventQueue= eq;
+    nh = nodeh; 
+    eventQueue= eq; 
     lin_vel = 0.0;
     ang_vel = 0.0;
 
@@ -356,7 +358,7 @@ AutomowerSafe::AutomowerSafe(const ros::NodeHandle& nodeh, decision_making::RosE
 
     ROS_INFO("AutomowerSafe::Loaded HCP/TIF codec...let's go!");
 }
-
+//serialFd= int för serial port handle /R
 AutomowerSafe::~AutomowerSafe()
 {
     if (serialFd >= 0)
@@ -365,7 +367,7 @@ AutomowerSafe::~AutomowerSafe()
     }
 }
 
-
+//TifCmd.srv, ROS file. takes a string and returns a string http://wiki.ros.org/srv /R
 bool AutomowerSafe::executeTifCommand(am_driver_safe::TifCmd::Request& req,
                                       am_driver_safe::TifCmd::Response& res)
 {
@@ -384,7 +386,7 @@ bool AutomowerSafe::executeTifCommand(am_driver_safe::TifCmd::Request& req,
 
     return true;
 }
-
+//uploading the JSON file under config
 std::string AutomowerSafe::loadJsonModel(std::string fileName)
 {
     std::string line;
@@ -409,13 +411,13 @@ std::string AutomowerSafe::loadJsonModel(std::string fileName)
     }
 }
 
-
+//connecting serialport to Automower /R
 bool AutomowerSafe::setup()
 {
     struct termios term;
 
     // Open serial port
-
+    //serialFd= int för serial port handle /R
     serialFd = open(pSerialPort.c_str(), O_RDWR /* | O_NONBLOCK */);
     close(serialFd);
     serialFd = open(pSerialPort.c_str(), O_RDWR /* | O_NONBLOCK */);
@@ -441,7 +443,7 @@ bool AutomowerSafe::setup()
 
         return false;
     }
-
+    // set function in cpp: void* memset( void* dest, int ch, std::size_t count ); google
     memset(&term, 0, sizeof(term));
 
     /* man termios get more info on below settings */
