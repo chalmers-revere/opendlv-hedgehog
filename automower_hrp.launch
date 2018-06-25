@@ -2,7 +2,9 @@
   <!-- urdf xml robot description loaded on the Parameter Server-->
   <param name="robot_description" command="$(find xacro)/xacro.py '$(find am_description)/urdf/automower.urdf.xacro'" />
 
-  
+  <!-- example-->
+  <node name="mimick" pkg="package" type="node" output="screen">
+    <param name="serialPort" value="/dev/ttyACM0" type="str" />
 
   <!-- Start the am_driver -->
   <node name="am_driver_safe" pkg="am_driver_safe" type="am_driver_safe_node" output="screen">
