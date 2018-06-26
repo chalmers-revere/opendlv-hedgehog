@@ -1,0 +1,20 @@
+//own written odvd messages. Test
+#include <std_msgs>
+message opendlv.hedgehog.std_msgs [id = 3000] {
+  std_msgs::uint32 seq [id = 1];
+  std_msgs::time stamp [id = 2];
+  string frame_id [id = 3];
+  }
+  
+message opendlv.hedgehog.position [id = 3001] {
+std_msgs::float64 x [id = 1];
+std_msgs::float64 y [id = 2];
+std_msgs::float64 z [id = 3];
+}
+
+message opendlv.hedgehog.orientation [id = 3002] {
+std_msgs::float64 x [id = 1];
+std_msgs::float64 y [id = 2];
+std_msgs::float64 z [id = 3];
+std_msgs::float64 w [id = 4];
+}
