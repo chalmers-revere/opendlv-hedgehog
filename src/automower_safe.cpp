@@ -510,23 +510,6 @@ bool AutomowerSafe::setup()
 
     return true;
 }
-void AutomowerSafe::imuResetCallback(const geometry_msgs::Pose::ConstPtr& msg)
-{
-
-    ROS_INFO("Automower::imuResetCallback!");
-    // Set heading from orientation
-    tf::Quaternion q;
-    double r, p, y;
-    tf::quaternionMsgToTF(msg->orientation, q);
-    tf::Matrix3x3(q).getRPY(r, p, y);
-    yaw = y;
-
-    // Set pose to the IMU Positions
-    xpos = msg->position.x;
-    ypos = msg->position.y;
-    //~ zpos = msg->position.z;
-}
-
 void AutomowerSafe::velocityCallback(const geometry_msgs::Twist::ConstPtr& vel)
 {
     regulateBySpeed = true;
@@ -1133,78 +1116,6 @@ bool AutomowerSafe::getPitchAndRoll()
     }
 }
 
-bool AutomowerSafe::getGPSData()
-{
-    hcp_tResult result;
-    const char* GPS_Msg = "RealTimeData.GetGPSData()";
-    if (!sendMessage(GPS_Msg, sizeof(GPS_Msg), result))
-    {
-        return false;
-    }
-
-    if (result.parameterCount == 15)
-    {
-        uint8_t north;
-        uint8_t east;
-        unsigned int latitudeDegMinutes;
-        unsigned int latitudeDecimalMinute;
-        unsigned int longitudeDegMinutes;
-        unsigned int longitudeDecimalMinute;
-        uint8_t  nbrSatellites;
-        double latitude;
-        double longitude;
-        unsigned int hdop;
-        uint8_t GPS_status;
-
-        nbrSatellites          = result.parameters[1].value.u8;
-        hdop                   = result.parameters[2].value.u16;
-        north                  = result.parameters[3].value.u8;
-        east                   = result.parameters[4].value.u8;
-        latitudeDegMinutes     = result.parameters[5].value.u32;
-        latitudeDecimalMinute  = result.parameters[6].value.u32;
-        longitudeDegMinutes    = result.parameters[7].value.u32;
-        longitudeDecimalMinute = result.parameters[8].value.u32;
-        GPS_status             = result.parameters[14].value.u8;
-
-        if (north == 1)
-        {
-            latitude = latitudeDegMinutes/100 + (latitudeDegMinutes%100 + latitudeDecimalMinute*0.0001)/60;
-        }
-        else
-        {
-            latitude = -(latitudeDegMinutes/100 + (latitudeDegMinutes%100 + latitudeDecimalMinute*0.0001)/60);
-        }
-        if (east == 1)
-        {
-            longitude = longitudeDegMinutes/100 + (longitudeDegMinutes%100 + longitudeDecimalMinute*0.0001)/60;
-        }
-        else
-        {
-            longitude = -(longitudeDegMinutes/100 + (longitudeDegMinutes%100 + longitudeDecimalMinute*0.0001)/60);
-        }
-
-        double covariance = (hdop *1.5)* (hdop *1.5);    // Approximate the covariance
-
-        m_navSatFix_msg.header.stamp  = ros::Time::now();
-        m_navSatFix_msg.latitude  = latitude;
-        m_navSatFix_msg.longitude = longitude;
-        m_navSatFix_msg.altitude  = 0.0;
-
-        for (int i=0; i++; i<9)
-        {
-            m_navSatFix_msg.position_covariance[i]  = covariance;
-        }
-
-        m_navSatFix_msg.position_covariance_type = sensor_msgs::NavSatFix::COVARIANCE_TYPE_APPROXIMATED;
-        m_navSatFix_msg.status.status = GPS_status;
-        m_navSatFix_msg.status.service = sensor_msgs::NavSatStatus::SERVICE_GPS;
-
-        navSatFix_pub.publish(m_navSatFix_msg);
-
-        //std:: cout << "nSat : " << int(nbrSatellites) << "  lat: " << latitude << "  long: "  << longitude << " status: " << int(GPS_status) << " " << latitudeDegMinutes  << " " << latitudeDecimalMinute << std::endl;
-    }
-    return true;
-}
 
 bool AutomowerSafe::getStateData()
 {
@@ -1643,112 +1554,6 @@ bool AutomowerSafe::isTimeOut(ros::Duration elapsedTime, double frequency)
     return false;
 }
 
-void AutomowerSafe::handleCollisionInjections(ros::Duration dt)
-{
-    switch (collisionState)
-    {
-        // 1 - 4: states for manually injecting collision
-        case 1:
-        {
-            ROS_INFO("Collision.SetSimulation(onOff:1)");
-            hcp_tResult result; 
-            const char* msg = "Collision.SetSimulation(onOff:1)";
-            if (!sendMessage(msg, sizeof(msg), result))
-            {
-                eventQueue->raiseEvent("/COM_ERROR");
-            }
-            collisionState = 2;
-            break;
-        }
-        case 2:
-        {
-            ROS_INFO("Collision.SetSimulatedStatus(status:1)");
-            hcp_tResult result; 
-            const char* msg =  "Collision.SetSimulatedStatus(status:1)";
-            if (!sendMessage(msg, sizeof(msg), result))
-            {
-                eventQueue->raiseEvent("/COM_ERROR");
-            }
-            timeSinceCollision = ros::Duration(0.0);
-            collisionState = 3;
-            break;
-        }
-        case 3:
-        {   
-            
-            timeSinceCollision += dt;
-            // x ms before deactivating the collision signal
-            if (isTimeOut(timeSinceCollision, 1))
-            {
-                ROS_INFO( "Collision.SetSimulatedStatus(status:0)");
-                hcp_tResult result; 
-                const char* msg =  "Collision.SetSimulatedStatus(status:0)";
-                if (!sendMessage(msg, sizeof(msg), result))
-                {
-                    eventQueue->raiseEvent("/COM_ERROR");
-                }
-                collisionState = 4;
-            }
-            break;
-            
-        }
-        case 4:
-        {
-            hcp_tResult result; 
-            ROS_INFO("Collision.SetSimulation(onOff:0)");
-            const char* msg = "Collision.SetSimulation(onOff:0)";
-            if (!sendMessage(msg, sizeof(msg), result))
-            {
-                eventQueue->raiseEvent("/COM_ERROR");
-            }
-            collisionState = 0;
-            break;
-        }
-
-
-        //state 5 - 6  - Disable collision sensors
-        case 5:
-        {
-            ROS_INFO("Collision.SetSimulation(onOff:1)");
-            hcp_tResult result; 
-            const char* msg = "Collision.SetSimulation(onOff:1)";
-            if (!sendMessage(msg, sizeof(msg), result))
-            {
-                eventQueue->raiseEvent("/COM_ERROR");
-            }
-            collisionState = 6;
-            break;
-        }
-        case 6:
-        {
-            ROS_INFO("Collision.SetSimulatedStatus(status:0)");
-            hcp_tResult result; 
-            const char* msg =  "Collision.SetSimulatedStatus(status:0)";
-            if (!sendMessage(msg, sizeof(msg), result))
-            {
-                eventQueue->raiseEvent("/COM_ERROR");
-            }
-            collisionState = 0;
-            break;
-        }
-
-        //state 7  - Enable collision sensors
-        case 7:
-        {
-            ROS_INFO("Collision.SetSimulation(onOff:0)");
-            hcp_tResult result; 
-            const char* msg = "Collision.SetSimulation(onOff:0)";
-            if (!sendMessage(msg, sizeof(msg), result))
-            {
-                eventQueue->raiseEvent("/COM_ERROR");
-            }
-            collisionState = 0;
-            break;
-        }
-
-    }
-}
-
 bool AutomowerSafe::update(ros::Duration dt)
 {
     if (serialPortState == AM_SP_STATE_ERROR)
@@ -1901,12 +1706,12 @@ bool AutomowerSafe::update(ros::Duration dt)
             timeSincebattery *= 0;
             newData = true;
         }
-        if (isTimeOut(timeSinceGPS, GPSCheckFreq))
+        /*if (isTimeOut(timeSinceGPS, GPSCheckFreq))
         {
-            getGPSData();
+            getGPSData(); //taken away
             timeSinceGPS *= 0;
             newData = true;
-        }
+        }*/
 
         if (newSound)
         {
@@ -1919,7 +1724,7 @@ bool AutomowerSafe::update(ros::Duration dt)
             newSound = false;
         }
 
-        handleCollisionInjections(dt);
+        //handleCollisionInjections(dt); a method we took away
     }
 
     if (!newData)
@@ -2163,7 +1968,7 @@ void AutomowerSafe::cutDiscHandling()
     }
 }
 
-void AutomowerSafe::loopDetectionHandling()
+*/void AutomowerSafe::loopDetectionHandling()
 {
     DEBUG_LOG("AutoMowerSafe::loopDetectionHandling()" );
 
@@ -2177,10 +1982,10 @@ void AutomowerSafe::loopDetectionHandling()
         eventQueue->raiseEvent("/COM_ERROR");
     }
 
-}
+}*/
 
 
-void AutomowerSafe::cuttingHeightHandling()
+/*void AutomowerSafe::cuttingHeightHandling()
 {
     hcp_tResult result;
     DEBUG_LOG("AutoMowerSafe::cuttingHeightHandling()" );
@@ -2196,7 +2001,7 @@ void AutomowerSafe::cuttingHeightHandling()
         eventQueue->raiseEvent("/COM_ERROR");
     }
 
-}
+}*/
 
 
 void AutomowerSafe::cutDiscOff()
