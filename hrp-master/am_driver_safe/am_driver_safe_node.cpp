@@ -48,38 +48,46 @@ int main( int argc, char** argv )
 
     ros::Time last_time = ros::Time::now();
 
-    std::thread fsmThread = std::thread(&stateMachineThread1);
-
+    //std::thread fsmThread = std::thread(&stateMachineThread1);
+    //manualMode();
 
     while( ros::ok() )
     {
         ros::Time current_time = ros::Time::now();
         ros::Duration dt = current_time - last_time;
         last_time = current_time;
-        am->update(dt);
+        //am->update(dt);
+        am->go();
 
         ros::spinOnce();
         rate.sleep();
 
     }
-
+    am->stopWheels();
+    am->cutDiscOff();
+/*
     if ( fsmThread.joinable() )
     {
         fsmThread.join();
-    }
+    }*/
 
     return 0;
 }
 
 
-void stateMachineThread1()
+void manualMode()
 {
-    ROS_INFO("AutomowerSafe StateMachine started. ");
+    std::cout << "INFO: AutomowerSafe Manual started " << std::endl;
+    eventQueue->async_spin();
+    
+    
+    /*ROS_INFO("AutomowerSafe StateMachine started. ");
+    
     eventQueue->async_spin();
 
     Husqvarna::FsmAutoMowerSafeStates(NULL, eventQueue, "AutoMowerSafeStates");
 
     ROS_INFO("AutomowerSafe StateMachine stopped.");
-
+    */
 }
 
