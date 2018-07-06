@@ -6,9 +6,8 @@
  */
 
 #include "am_driver_safe/automower_safe.h"
-#include <tf/transform_datatypes.h> //vad?
+#include <tf/transform_datatypes.h>
 
-//including normal cpp headers
 #include <math.h>
 #include <termios.h>
 #include <fcntl.h>
@@ -19,25 +18,24 @@
 #define DEG2RAD(DEG) ((DEG) * ((M_PI) / (180.0)))
 
 
-// OPERATIONAL MODES (i.e. published in SensorStatus.operationalMode) used in a switch loop rows 1225-1255/R
+// OPERATIONAL MODES (i.e. published in SensorStatus.operationalMode)
 #define AM_OP_MODE_OFFLINE (0x0000)
 #define AM_OP_MODE_CONNECTED_MANUAL (0x0001)
 #define AM_OP_MODE_CONNECTED_RANDOM (0x0002)
 
-// Serial port states (checking if the serialport is connected to the device. changes value of the variable serialPortState, declared in the header file /R)
+// Serial port states
 #define AM_SP_STATE_OFFLINE (0)
 #define AM_SP_STATE_ONLINE (1)
 #define AM_SP_STATE_CONNECTED (2)
 #define AM_SP_STATE_INITIALISING (3)
 #define AM_SP_STATE_ERROR (4)
 
-//never used in cpp./R
 #define AM_POWER_INCDEC (1)
 #define AM_POWER_THRESHOLD (0.1)
 
 
-// Sensor states (not necessary for now /R)
-/*#define HVA_SS_HMB_CTRL 0x0001
+// Sensor states
+#define HVA_SS_HMB_CTRL 0x0001
 #define HVA_SS_OUTSIDE 0x0002
 #define HVA_SS_COLLISION 0x0004
 #define HVA_SS_LIFTED 0x0008
@@ -48,17 +46,17 @@
 #define HVA_SS_CFG_NEEDED 0x0100
 #define HVA_SS_DISC_ON 0x0200
 #define HVA_SS_LOOP_ON 0x0400
-#define HVA_SS_CHARGING 0x0800 */
+#define HVA_SS_CHARGING 0x0800
 
 
-// Mower internal modes (not used in cpp /R)
+// Mower internal modes
 #define IMOWERAPP_MODE_AUTO (0)
 #define IMOWERAPP_MODE_MANUAL (1)
 #define IMOWERAPP_MODE_HOME (2)
 #define IMOWERAPP_MODE_DEMO (3)
 
 
-// Mower internal states (declared in sensorstatus.msg, used in switch as different cases for variable state (=result.parameters[0].value.u8 (VA?)/R)
+// Mower internal states
 #define IMOWERAPP_STATE_OFF              0
 #define IMOWERAPP_STATE_WAIT_SAFETY_PIN  1
 #define IMOWERAPP_STATE_STOPPED          2
@@ -70,13 +68,13 @@
 #define IMOWERAPP_STATE_ERROR            8
 
 
-//#define DEBUG_LOG(X)  std::cout << X << std::endl; debug stuff/R
+//#define DEBUG_LOG(X)  std::cout << X << std::endl;
 #define DEBUG_LOG(X)
 
 #define RADIANS_PER_DEGREE (3.14159/180.0)
 
 
-//https://en.cppreference.com/w/cpp/language/namespace about namespaces /R
+
 namespace Husqvarna
 {
 
@@ -86,8 +84,8 @@ extern "C"
 #endif
 
 //
-// For HCP Runtime environment, information about each in hcp_runtime.h under include/hcp. chech typedef struct hcp_tHost
-// All are already defined fucktions in cpp (malloc, free etc.)
+// For HCP Runtime environment
+//
 static void* _malloc(hcp_Size_t size, void* ctx) {
     return malloc(size);
 }
@@ -103,7 +101,7 @@ static void* _memcpy(void* dest, const void* source, hcp_Size_t size, void*  ctx
 static void* _memset(void* dest, hcp_Int value, hcp_Size_t len, void*  ctx) {
     return memset(dest, value, len);
 };
-//codec==some github stuff
+
 hcp_Int compareCodec(void* codec, void* name, void* pState) {
     tCodec* c = (tCodec*)codec;
     return hcp_szStrCmp(c->name, (const hcp_szStr)name) == 0;
@@ -120,12 +118,12 @@ hcp_Boolean isCodec(void* codec, void* pState) {
 
 
 
-//class declared in header with all variables. ROS the whole shit /R
+
 AutomowerSafe::AutomowerSafe(const ros::NodeHandle& nodeh, decision_making::RosEventQueue* eq)
 {
     // Init attributes
-    nh = nodeh; 
-    eventQueue= eq; 
+    nh = nodeh;
+    eventQueue= eq;
     lin_vel = 0.0;
     ang_vel = 0.0;
 
@@ -358,7 +356,7 @@ AutomowerSafe::AutomowerSafe(const ros::NodeHandle& nodeh, decision_making::RosE
 
     ROS_INFO("AutomowerSafe::Loaded HCP/TIF codec...let's go!");
 }
-//serialFd= int för serial port handle /R
+
 AutomowerSafe::~AutomowerSafe()
 {
     if (serialFd >= 0)
@@ -367,7 +365,7 @@ AutomowerSafe::~AutomowerSafe()
     }
 }
 
-//TifCmd.srv, ROS file. takes a string and returns a string http://wiki.ros.org/srv /R
+
 bool AutomowerSafe::executeTifCommand(am_driver_safe::TifCmd::Request& req,
                                       am_driver_safe::TifCmd::Response& res)
 {
@@ -386,7 +384,7 @@ bool AutomowerSafe::executeTifCommand(am_driver_safe::TifCmd::Request& req,
 
     return true;
 }
-//uploading the JSON file under config
+
 std::string AutomowerSafe::loadJsonModel(std::string fileName)
 {
     std::string line;
@@ -411,13 +409,13 @@ std::string AutomowerSafe::loadJsonModel(std::string fileName)
     }
 }
 
-//connecting serialport to Automower /R
+
 bool AutomowerSafe::setup()
 {
     struct termios term;
 
     // Open serial port
-    //serialFd= int för serial port handle /R
+
     serialFd = open(pSerialPort.c_str(), O_RDWR /* | O_NONBLOCK */);
     close(serialFd);
     serialFd = open(pSerialPort.c_str(), O_RDWR /* | O_NONBLOCK */);
@@ -443,7 +441,7 @@ bool AutomowerSafe::setup()
 
         return false;
     }
-    // set function in cpp: void* memset( void* dest, int ch, std::size_t count ); google
+
     memset(&term, 0, sizeof(term));
 
     /* man termios get more info on below settings */
@@ -510,6 +508,23 @@ bool AutomowerSafe::setup()
 
     return true;
 }
+void AutomowerSafe::imuResetCallback(const geometry_msgs::Pose::ConstPtr& msg)
+{
+
+    ROS_INFO("Automower::imuResetCallback!");
+    // Set heading from orientation
+    tf::Quaternion q;
+    double r, p, y;
+    tf::quaternionMsgToTF(msg->orientation, q);
+    tf::Matrix3x3(q).getRPY(r, p, y);
+    yaw = y;
+
+    // Set pose to the IMU Positions
+    xpos = msg->position.x;
+    ypos = msg->position.y;
+    //~ zpos = msg->position.z;
+}
+
 void AutomowerSafe::velocityCallback(const geometry_msgs::Twist::ConstPtr& vel)
 {
     regulateBySpeed = true;
@@ -1116,6 +1131,78 @@ bool AutomowerSafe::getPitchAndRoll()
     }
 }
 
+bool AutomowerSafe::getGPSData()
+{
+    hcp_tResult result;
+    const char* GPS_Msg = "RealTimeData.GetGPSData()";
+    if (!sendMessage(GPS_Msg, sizeof(GPS_Msg), result))
+    {
+        return false;
+    }
+
+    if (result.parameterCount == 15)
+    {
+        uint8_t north;
+        uint8_t east;
+        unsigned int latitudeDegMinutes;
+        unsigned int latitudeDecimalMinute;
+        unsigned int longitudeDegMinutes;
+        unsigned int longitudeDecimalMinute;
+        uint8_t  nbrSatellites;
+        double latitude;
+        double longitude;
+        unsigned int hdop;
+        uint8_t GPS_status;
+
+        nbrSatellites          = result.parameters[1].value.u8;
+        hdop                   = result.parameters[2].value.u16;
+        north                  = result.parameters[3].value.u8;
+        east                   = result.parameters[4].value.u8;
+        latitudeDegMinutes     = result.parameters[5].value.u32;
+        latitudeDecimalMinute  = result.parameters[6].value.u32;
+        longitudeDegMinutes    = result.parameters[7].value.u32;
+        longitudeDecimalMinute = result.parameters[8].value.u32;
+        GPS_status             = result.parameters[14].value.u8;
+
+        if (north == 1)
+        {
+            latitude = latitudeDegMinutes/100 + (latitudeDegMinutes%100 + latitudeDecimalMinute*0.0001)/60;
+        }
+        else
+        {
+            latitude = -(latitudeDegMinutes/100 + (latitudeDegMinutes%100 + latitudeDecimalMinute*0.0001)/60);
+        }
+        if (east == 1)
+        {
+            longitude = longitudeDegMinutes/100 + (longitudeDegMinutes%100 + longitudeDecimalMinute*0.0001)/60;
+        }
+        else
+        {
+            longitude = -(longitudeDegMinutes/100 + (longitudeDegMinutes%100 + longitudeDecimalMinute*0.0001)/60);
+        }
+
+        double covariance = (hdop *1.5)* (hdop *1.5);    // Approximate the covariance
+
+        m_navSatFix_msg.header.stamp  = ros::Time::now();
+        m_navSatFix_msg.latitude  = latitude;
+        m_navSatFix_msg.longitude = longitude;
+        m_navSatFix_msg.altitude  = 0.0;
+
+        for (int i=0; i++; i<9)
+        {
+            m_navSatFix_msg.position_covariance[i]  = covariance;
+        }
+
+        m_navSatFix_msg.position_covariance_type = sensor_msgs::NavSatFix::COVARIANCE_TYPE_APPROXIMATED;
+        m_navSatFix_msg.status.status = GPS_status;
+        m_navSatFix_msg.status.service = sensor_msgs::NavSatStatus::SERVICE_GPS;
+
+        navSatFix_pub.publish(m_navSatFix_msg);
+
+        //std:: cout << "nSat : " << int(nbrSatellites) << "  lat: " << latitude << "  long: "  << longitude << " status: " << int(GPS_status) << " " << latitudeDegMinutes  << " " << latitudeDecimalMinute << std::endl;
+    }
+    return true;
+}
 
 bool AutomowerSafe::getStateData()
 {
@@ -1554,6 +1641,112 @@ bool AutomowerSafe::isTimeOut(ros::Duration elapsedTime, double frequency)
     return false;
 }
 
+void AutomowerSafe::handleCollisionInjections(ros::Duration dt)
+{
+    switch (collisionState)
+    {
+        // 1 - 4: states for manually injecting collision
+        case 1:
+        {
+            ROS_INFO("Collision.SetSimulation(onOff:1)");
+            hcp_tResult result; 
+            const char* msg = "Collision.SetSimulation(onOff:1)";
+            if (!sendMessage(msg, sizeof(msg), result))
+            {
+                eventQueue->raiseEvent("/COM_ERROR");
+            }
+            collisionState = 2;
+            break;
+        }
+        case 2:
+        {
+            ROS_INFO("Collision.SetSimulatedStatus(status:1)");
+            hcp_tResult result; 
+            const char* msg =  "Collision.SetSimulatedStatus(status:1)";
+            if (!sendMessage(msg, sizeof(msg), result))
+            {
+                eventQueue->raiseEvent("/COM_ERROR");
+            }
+            timeSinceCollision = ros::Duration(0.0);
+            collisionState = 3;
+            break;
+        }
+        case 3:
+        {   
+            
+            timeSinceCollision += dt;
+            // x ms before deactivating the collision signal
+            if (isTimeOut(timeSinceCollision, 1))
+            {
+                ROS_INFO( "Collision.SetSimulatedStatus(status:0)");
+                hcp_tResult result; 
+                const char* msg =  "Collision.SetSimulatedStatus(status:0)";
+                if (!sendMessage(msg, sizeof(msg), result))
+                {
+                    eventQueue->raiseEvent("/COM_ERROR");
+                }
+                collisionState = 4;
+            }
+            break;
+            
+        }
+        case 4:
+        {
+            hcp_tResult result; 
+            ROS_INFO("Collision.SetSimulation(onOff:0)");
+            const char* msg = "Collision.SetSimulation(onOff:0)";
+            if (!sendMessage(msg, sizeof(msg), result))
+            {
+                eventQueue->raiseEvent("/COM_ERROR");
+            }
+            collisionState = 0;
+            break;
+        }
+
+
+        //state 5 - 6  - Disable collision sensors
+        case 5:
+        {
+            ROS_INFO("Collision.SetSimulation(onOff:1)");
+            hcp_tResult result; 
+            const char* msg = "Collision.SetSimulation(onOff:1)";
+            if (!sendMessage(msg, sizeof(msg), result))
+            {
+                eventQueue->raiseEvent("/COM_ERROR");
+            }
+            collisionState = 6;
+            break;
+        }
+        case 6:
+        {
+            ROS_INFO("Collision.SetSimulatedStatus(status:0)");
+            hcp_tResult result; 
+            const char* msg =  "Collision.SetSimulatedStatus(status:0)";
+            if (!sendMessage(msg, sizeof(msg), result))
+            {
+                eventQueue->raiseEvent("/COM_ERROR");
+            }
+            collisionState = 0;
+            break;
+        }
+
+        //state 7  - Enable collision sensors
+        case 7:
+        {
+            ROS_INFO("Collision.SetSimulation(onOff:0)");
+            hcp_tResult result; 
+            const char* msg = "Collision.SetSimulation(onOff:0)";
+            if (!sendMessage(msg, sizeof(msg), result))
+            {
+                eventQueue->raiseEvent("/COM_ERROR");
+            }
+            collisionState = 0;
+            break;
+        }
+
+    }
+}
+
 bool AutomowerSafe::update(ros::Duration dt)
 {
     if (serialPortState == AM_SP_STATE_ERROR)
@@ -1706,12 +1899,12 @@ bool AutomowerSafe::update(ros::Duration dt)
             timeSincebattery *= 0;
             newData = true;
         }
-        /*if (isTimeOut(timeSinceGPS, GPSCheckFreq))
+        if (isTimeOut(timeSinceGPS, GPSCheckFreq))
         {
-            getGPSData(); //taken away
+            getGPSData();
             timeSinceGPS *= 0;
             newData = true;
-        }*/
+        }
 
         if (newSound)
         {
@@ -1724,7 +1917,7 @@ bool AutomowerSafe::update(ros::Duration dt)
             newSound = false;
         }
 
-        //handleCollisionInjections(dt); a method we took away
+        handleCollisionInjections(dt);
     }
 
     if (!newData)
@@ -1968,7 +2161,7 @@ void AutomowerSafe::cutDiscHandling()
     }
 }
 
-*/void AutomowerSafe::loopDetectionHandling()
+void AutomowerSafe::loopDetectionHandling()
 {
     DEBUG_LOG("AutoMowerSafe::loopDetectionHandling()" );
 
@@ -1982,10 +2175,10 @@ void AutomowerSafe::cutDiscHandling()
         eventQueue->raiseEvent("/COM_ERROR");
     }
 
-}*/
+}
 
 
-/*void AutomowerSafe::cuttingHeightHandling()
+void AutomowerSafe::cuttingHeightHandling()
 {
     hcp_tResult result;
     DEBUG_LOG("AutoMowerSafe::cuttingHeightHandling()" );
@@ -2001,7 +2194,7 @@ void AutomowerSafe::cutDiscHandling()
         eventQueue->raiseEvent("/COM_ERROR");
     }
 
-}*/
+}
 
 
 void AutomowerSafe::cutDiscOff()
