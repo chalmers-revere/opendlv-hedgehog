@@ -1747,7 +1747,60 @@ void AutomowerSafe::handleCollisionInjections(ros::Duration dt)
 
     }
 }
+	
+bool AutomowerSafe::go()
+	{
+    if (serialPortState == AM_SP_STATE_ERROR)
+    {
+        if (!serialComTest)
+        {
+            nextAutomowerInitTime = ros::Time::now() + ros::Duration(2.0);  // only wait a short time
+            ROS_WARN("Communication error. New try in 2 seconds");
+        }
+        else
+        {
+            //In this case we want a long pause to see the automower behaviour
+            nextAutomowerInitTime = ros::Time::now() + ros::Duration(30);   // Results in waiting in 30 second
+            ROS_WARN("SerialComTest:   Communication error. New try in 30 seconds");
+        }
+        serialPortState = AM_SP_STATE_OFFLINE;
+    }
 
+    if (serialPortState == AM_SP_STATE_OFFLINE)
+    {
+	std::cout << "AM_SP_STATE_OFFLINE" << std::endl;
+
+    }
+
+    if (serialPortState == AM_SP_STATE_ONLINE)
+    {
+	std::cout << "AM_SP_STATE_ONLINE" << std::endl;
+        serialPortState = AM_SP_STATE_CONNECTED;
+
+
+        if (requestedState == AM_STATE_MANUAL)
+        {
+            std::cout << "MANUAL MODE!!!'(" << std::endl;
+			pauseMower();
+			cutDiscOff();
+			setAutoMode();
+        }
+        else if (requestedState == AM_STATE_RANDOM)
+        {
+		am->stopWheels();
+   		am->cutDiscOff();
+            std::cout << "The program want´s random :'(" << std::endl;
+        }
+    }
+
+    if (serialComTest)
+    {
+        doSerialComTest();
+        return true;
+    }
+
+    return true;
+}
 bool AutomowerSafe::update(ros::Duration dt)
 {
     if (serialPortState == AM_SP_STATE_ERROR)
