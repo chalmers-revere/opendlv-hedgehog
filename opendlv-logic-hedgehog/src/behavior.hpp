@@ -26,18 +26,18 @@ class Behavior {
     void step() noexcept; 
     
    private:
-    opendlv::proxy::DistanceReading m_frontUltrasonicReading;
-    opendlv::proxy::DistanceReading m_rearUltrasonicReading;
+    //opendlv::proxy::DistanceReading m_frontUltrasonicReading;
+    //opendlv::proxy::DistanceReading m_rearUltrasonicReading;
     opendlv::proxy::VoltageReading m_leftIrReading;
     opendlv::proxy::VoltageReading m_rightIrReading;
     opendlv::proxy::GroundSteeringRequest m_groundSteeringAngleRequest;
     opendlv::proxy::PedalPositionRequest m_pedalPositionRequest;
     //std::mutex m_frontUltrasonicReadingMutex;
     //std::mutex m_rearUltrasonicReadingMutex;
-    //std::mutex m_leftIrReadingMutex;
-    //std::mutex m_rightIrReadingMutex;
-    //std::mutex m_groundSteeringAngleRequestMutex;
-    //std::mutex m_pedalPositionRequestMutex;
+    std::mutex m_leftIrReadingMutex;
+    std::mutex m_rightIrReadingMutex;
+    std::mutex m_groundSteeringAngleRequestMutex;
+    std::mutex m_pedalPositionRequestMutex;
 };
 
 #endif
