@@ -7,3 +7,5 @@
 
 #include "opendlv-standard-message-set.hpp"
 #include "automower_hrp.json"
+
+auto 
