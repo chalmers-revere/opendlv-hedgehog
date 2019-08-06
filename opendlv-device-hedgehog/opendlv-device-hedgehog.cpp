@@ -26,9 +26,9 @@ int32_t main(int32_t argc, char **argv) {
     uint32_t const FRAME_ID = std::stoi(commandlineArguments["frame-id"]);
    
 
-Behavior behavior
+Automower automower
 
-auto onGroundMotionRequest{[&behavior](cluon::data::envelope &&envelope)
+auto onGroundMotionRequest{[&automower](cluon::data::envelope &&envelope)
 {
   if (envelope.senderStamp() == 0){
      auto const groudMotion = cluon::extractMessage<opendlv::proxy::GroundMotionRequest>(std::move(envelope));
