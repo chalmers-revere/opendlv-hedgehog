@@ -1,1 +1,7 @@
-
+message opendlv.proxy.GroundMotionRequest [id = 1089] {
+  float vx [id = 1];
+  float vy [id = 2];
+  float vz [id = 3];
+  float rollRate [id = 4];
+  float pitchRate [id = 5];
+  float yawRate [id = 6];
