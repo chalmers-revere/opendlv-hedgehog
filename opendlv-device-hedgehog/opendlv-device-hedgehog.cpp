@@ -32,8 +32,9 @@ auto onGroundMotionRequest{[&automower](cluon::data::envelope &&envelope)
 {
   if (envelope.senderStamp() == 0){
      auto const groudMotion = cluon::extractMessage<opendlv::proxy::GroundMotionRequest>(std::move(envelope));
-     behavior.linearspeed(groudMotion.vx);
-     behavior.angularspeed(groundMotion.rollRate);
+     automower.RequestLinearSpeed(groudMotion);
+     automower.RequestAngularSpeed(groundmotion);
+  
      
   } else if (envelope.senderStamp() == 9999) {
      auto const gst = cluon::extractMessage<opendlv::proxy::GroundMotionRequest>(std::move(envelope));
