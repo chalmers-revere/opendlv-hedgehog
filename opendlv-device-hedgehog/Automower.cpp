@@ -1,12 +1,11 @@
 #include "automower.hpp"
 
 AutomowerSafe::AutomowerSafe() :
+
+m_linearSpeedRequest{};
+m_angularSpeedRequest{};
+
 {
-
-m_linearSpeedRequest;
-m_angularSpeedRequest;
-
-
 }
   
 void Automower::RequestLinearSpeed(opendlv::proxy::GroundMotionRequest const &linearSpeedRequest) noexcept
@@ -19,9 +18,22 @@ void Automower::RequestAngularSpeed(opendlv::proxy::GroundMotionRequest const &a
 m_angularSpeedRequest=angularSpeedRequest
 }
 
+void Automower::velocity()
+{
+   opendlv::proxy::GroundMotionRequest linearSpeedRequest;
+   opendlv::proxy::GroundMotionRequest angularSpeedRequest;
+   {
+
+    float lin_vel = linearSpeedRequest;
+    float ang_vel = angumarSpeedRequest;
+
+    wanted_lv = lin_vel - ang_vel * AUTMOWER_WHEEL_BASE_WIDTH / 2;
+    wanted_rv = lin_vel + ang_vel * AUTMOWER_WHEEL_BASE_WIDTH / 2;
+   }
+}
 
 
-int AutomowerSafe::sendMessage(unsigned char *msg, int len, unsigned char *ansmsg, int maxAnsLength, bool retry)
+int Automower::sendMessage(unsigned char *msg, int len, unsigned char *ansmsg, int maxAnsLength, bool retry)
 {
  /*
  	std::cout << "SEND: " << std::hex;
@@ -119,7 +131,7 @@ int AutomowerSafe::sendMessage(unsigned char *msg, int len, unsigned char *ansms
 }   
 
 
-std::string AutomowerSafe::loadJsonModel(std::string fileName)
+std::string Automower::loadJsonModel(std::string fileName)
 {
     std::string line;
     std::ifstream file(fileName.c_str());
@@ -143,23 +155,41 @@ std::string AutomowerSafe::loadJsonModel(std::string fileName)
     }
 }
 
-bool AutomowerSafe::initAutomowerBoard()
+bool Automower::initAutomowerBoard()
 {
   std::cout << "AutomowerSafe::initAutomowwerBoard" << std::endl;
   
-  
-void AutomowerSafe::velocityCallback(float const & )
+
+void Automower::regulateVelocity()
 {
-    velocityRegulator = true;
+    if (!m_regulatingActive)
+    {
+        return;
+    }
 
-    lin_vel = (double)vel->linear.x;
-    ang_vel = (double)vel->angular.z;
+    power_l = leftWheelPid.Update(current_lv, wanted_lv);
+    power_r = rightWheelPid.Update(current_rv, wanted_rv);
 
-    wanted_lv = lin_vel - ang_vel * AUTMOWER_WHEEL_BASE_WIDTH / 2;
-    wanted_rv = lin_vel + ang_vel * AUTMOWER_WHEEL_BASE_WIDTH / 2;
-    
+    sendWheelPower(power_l, power_r);
+}
+ 
 
-AutomowerSafe::stopWheels()
+bool Automower::getWheelData()
+{ 
+    hcp_tResult result;
+
+    const char* msg = "RealTimeData.GetWheelMotorData()";
+    if (!sendMessage(msg, sizeof(msg), result))
+    {
+        return false;
+    }
+
+    int16_t tmpValue;
+    tmpValue = result.parameters[1].value.i16;
+    current_lv = ((double)tmpValue) / 1000.0;
+ }	
+	
+void AutomowerSafe::stopWheels()
 {
 
     //DEBUG_LOG ("AutomowerSafe::stopWheels()")
@@ -180,10 +210,12 @@ AutomowerSafe::stopWheels()
 
     return;
 }
+	
+float Automower::convertSpeedtoPower(float speed) const
+{
+  
 
-
-
-
+}
 
 
 void AutomowerSafe::sendWheelPower(double power_left, double power_right)
