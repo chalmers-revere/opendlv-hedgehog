@@ -111,7 +111,7 @@ int32_t main(int32_t argc, char **argv)
               
               
               struct js_event js; //joystick device
-              while (::read(gamepadDevice, &js, sizeof(struct js_event)) > 0) { //redaing joystick device
+              while (::read(gamepadDevice, &js, sizeof(struct js_event)) > 0) { //reading joystick device
                 float percent{0};
                 switch (js.type & ~JS_EVENT_INIT) {
                   case JS_EVENT_AXIS:
@@ -143,7 +143,11 @@ int32_t main(int32_t argc, char **argv)
           }
           });
     
-   // Then this next code just manages and sends data to the lawnmover via standard-messages. We have to convert these messages into hrp-json messages which are the messages understable by hedgehog
+      // Explanation of joystick js : js_event corresponds to what happens, if you press a button JS_EVENT_BUTTON or turn the joystick JS_EVENT_AXIS
+      // Then the values of js.number correspond to the axis or button that generated the event. There is a specific number for one axis. It's just a way to know in which direction/axis we put the joystick
+      // Finally js.value is a signed integer between -32767and 32767 which recover the postion of the joystick.
+      
+      // Then the next code just manages and sends data to the lawnmover via standard-messages. We have to convert these messages into hrp-json messages which are the messages understable by hedgehog
       
       cluon::OD4Session od4{static_cast<uint16_t>(std::stoi(commandlineArguments["cid"]))};
       if (od4.isRunning()) {
