@@ -42,8 +42,7 @@ int32_t main(int32_t argc, char **argv)
     
     const float FREQ = std::stof(commandlineArguments["freq"]); //convert string type to float type
 
-    //This first part of the code just get data and command from the joystick : it manages the case of error and just recover axis, device and freq data. 
-    
+   
     int gamepadDevice;
     if ( -1 == (gamepadDevice = ::open(DEVICE.c_str(), O_RDONLY)) ) {
       std::cerr << "[opendlv-device-gamepad]: Could not open device: " << DEVICE << ", error: " << errno << ": " << strerror(errno) << std::endl;
@@ -107,7 +106,8 @@ int32_t main(int32_t argc, char **argv)
             if (FD_ISSET(gamepadDevice, &setOfFiledescriptorsToReadFrom)) {
               std::lock_guard<std::mutex> lck(valuesMutex);
 
-            // select function is set on line 104. When the select statement exits, line 107 check which file descriptor has been active and if a file descriptor is part of the set. Then it makes some mutex managment
+            // select function is set on line 104. When the select statement exits, line 107 check which file 
+            //descriptor has been active and if a file descriptor is part of the set. Then it makes some mutex managment.
               
               
               struct js_event js; //joystick device
@@ -143,8 +143,10 @@ int32_t main(int32_t argc, char **argv)
           }
           });
     
-      // Explanation of joystick js : js_event corresponds to what happens, if you press a button JS_EVENT_BUTTON or turn the joystick JS_EVENT_AXIS
-      // Then the values of js.number correspond to the axis or button that generated the event. There is a specific number for one axis. It's just a way to know in which direction/axis we put the joystick
+      // Explanation of joystick js : js_event corresponds to what happens, if you press a button JS_EVENT_BUTTON or turn 
+      // the joystick JS_EVENT_AXIS.
+      // Then the values of js.number correspond to the axis or button that generated the event. There is a specific number for one axis. 
+      // It's just a way to know in which direction/axis we put the joystick.
       // Finally js.value is a signed integer between -32767and 32767 which recover the postion of the joystick.
       
       // Then the next code just manages and sends data to the lawnmover via standard-messages. We have to convert these messages into hrp-json messages which are the messages understable by hedgehog
