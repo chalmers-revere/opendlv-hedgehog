@@ -1,0 +1,302 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+
+  <title>OpenDLV Vehicle View - Details for '{{name}}'</title>
+
+  <link type="text/css" rel="stylesheet" href="css/maptalks.css"/>
+  <link type="text/css" rel="stylesheet" href="css/all.css"/>
+  <link type="text/css" rel="stylesheet" href="css/bootstrap.min.css"/>
+  <link type="text/css" rel="stylesheet" href="css/navbar-top-fixed.css"/>
+
+  <style>
+      #map { width: 640px; height: 480px; }
+  </style>
+</head>
+
+<script>
+function deleteExternallySuppliedODVDFile() {
+    if (confirm("Do you really want to remove previously provided message specification file?")) {
+        fetch('/deleteodvdfile', { method: 'post',
+                                   headers: {
+                                       'Accept': 'application/json, text/plain, */*',
+                                       'Content-Type': 'application/json'
+                                   } }
+        )
+        .then(function(response) {
+            if(response.ok) {
+                location.reload();
+                return;
+            }
+            throw new Error('Request failed.');
+            })
+        .catch(function(error) {
+            console.log(error);
+        });
+    }
+}
+
+var g_geojson = window.atob("{{geojson}}".replace("&#x3D;", ""));
+var g_firstWGS84 = JSON.parse(window.atob("{{firstWGS84}}".replace("&#x3D;", "")));
+var g_lastWGS84 = JSON.parse(window.atob("{{lastWGS84}}".replace("&#x3D;", "")));
+</script>
+
+<script>
+var keepString = "";
+function exportSelectedMessages() {
+    $("input:checkbox").each(function() {
+        if ($(this).is(":checked")) {
+            if (0 == keepString.length) {
+                keepString = "--keep=" + $(this).val();
+            }
+            else {
+                keepString += "," + $(this).val();
+            }
+        }
+    });
+    if (0 != keepString.length) {
+        if (confirm("Do you really want to export the selected messages into a new .rec file?")) {
+            document.body.style.cursor = 'wait';
+            fetch('/exportselectedmessages', { method: 'post',
+                                               headers: {
+                                                   'Accept': 'application/json, text/plain, */*',
+                                                   'Content-Type': 'application/json'
+                                               },
+                                               body: JSON.stringify({keepString: keepString,
+                                                                     recordingFile: "{{filename}}"})
+                                             }
+            )
+            .then(function(response) {
+                if(response.ok) {
+                    var f = "{{filename}}";
+                    alert('Messages exported into ' + f.substr(0, f.lastIndexOf('.rec')) + '-selection.rec. You can find the file in the folder view.');
+                    document.body.style.cursor = 'default';
+                    return;
+                }
+                document.body.style.cursor = 'default';
+                throw new Error('Request failed.');
+                })
+            .catch(function(error) {
+                console.log(error);
+            });
+        }
+    }
+    keepString = "";
+}
+</script>
+
+<body>
+  <nav class="navbar navbar-expand-md navbar-dark fixed-top bg-dark">
+    <button id="back" type="button" class="fas fa-arrow-left" style="font-size:20px;color:#555;padding: 5px 30px;" onclick="location.href='/recordings'">
+  </nav>
+
+
+  <div class="container-fluid">
+    <center>
+      <div onclick="location.href='{{filename}}'" onmouseover="" style="cursor: pointer;"><h4>{{name}}</h4></div>
+  {{#if hasODVD}}
+      <button id="deleteExternallySuppliedODVDFile" type="button" class="far fa-trash-alt" style="font-size:20px;color:#555;padding: 5px 30px;" onclick="deleteExternallySuppliedODVDFile()" title="&nbsp;Remove provided message specification file.">Remove provided message specification file.</button>
+  {{/if}}
+    </center>
+  </div>
+
+
+  <div class="container-fluid">
+    <div class="tabbable" id="tabs-list">
+      <ul class="nav nav-tabs">
+        <li class="nav-item">
+          <a class="nav-link active show" href="#panel-overview" data-toggle="tab">Overview</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" href="#panel-comments" data-toggle="tab">Comments</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" href="#panel-messages" data-toggle="tab">Messages</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" href="#panel-map" data-toggle="tab">Map</a>
+        </li>
+      </ul>
+
+    <div class="tab-content">
+      <div class="tab-pane active show" id="panel-overview">
+        <br>
+        <center>
+          <table cellpadding="2" width="60%">
+            {{#each fileInformation}}
+            <tr>
+              <td align="left">
+              {{key}}
+              </td>
+              <td align="left">
+              {{value}}
+              </td>
+            </tr>
+            {{/each}}
+          </table>
+        </center>
+        <br>
+      </div>
+
+      <div class="tab-pane" id="panel-comments">
+        <br>
+        <center>
+          <table cellpadding="2" width="60%">
+            {{#each comments}}
+            <tr>
+              <td align="left">
+              <i class="far fa-comment"></i> {{key}}:
+              </td>
+              <td align="left">
+              "{{value}}"
+              </td>
+            </tr>
+            {{/each}}
+          </table>
+        </center>
+      </div>
+
+      <div class="tab-pane" id="panel-messages">
+        <br>
+        <center><button id="exportSelectedMessages" type="button" class="far fa-check-square" style="font-size:20px;color:#555;padding: 5px 30px;" onclick="exportSelectedMessages()" title="Export the selected messages into a new .rec file.">&nbsp;Export the selected messages into a new .rec file.</button></center>
+        <br>
+        <center>
+          <table cellpadding="2" width="80%">
+            {{#each messages}}
+            <tr>
+              <td align="left">
+                {{#if selectable}}
+                <input type="checkbox" id="isSelected-{{key}}" name="isSelected-{{key}}" value="{{messageID}}/{{senderStamp}}" title="Include this message in export."/>
+                {{/if}}
+                number of '{{key}}' (message ID = {{messageID}}, sender stamp = {{senderStamp}}):
+              </td>
+              <td align="right">
+              {{value}}
+              </td>
+            </tr>
+            {{/each}}
+          </table>
+        </center>
+      </div>
+
+      <div class="tab-pane" id="panel-map">
+      <br>
+      <center><div id="map"></div></center>
+      </div>
+    </div>
+
+  </div>
+
+  <script type="text/javascript" src="js/maptalks.min.js"></script>
+  <script type="text/javascript" src="js/jquery-3.3.1.slim.min.js"></script>
+  <script type="text/javascript" src="js/popper.min.js"></script>
+  <script type="text/javascript" src="js/bootstrap.min.js"></script>
+
+<script>
+  var g_map = new maptalks.Map('map', {
+    center : [-118.150127,33.779397],
+    zoom : 15,
+    centerCross: true,
+    baseLayer: new maptalks.TileLayer('base', {
+      urlTemplate: 'http://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png',
+      subdomains: ['a','b','c','d'],
+      attribution: '&copy; <a href="http://osm.org">OpenStreetMap</a> contributors, &copy; <a href="https://carto.com/">CARTO</a>'
+    }),
+    layers : [
+      new maptalks.VectorLayer('trace')
+    ]
+  });
+
+  if ( (g_firstWGS84 != null) && (g_lastWGS84 != null) ) {
+    var c = [g_firstWGS84.longitude, g_firstWGS84.latitude];
+    g_map.setCenter(c);
+
+    var startOfRecordingLocation = [g_firstWGS84.longitude, g_firstWGS84.latitude];
+    var endOfRecordingLocation = [g_lastWGS84.longitude, g_lastWGS84.latitude];
+    var gpsTrace = new maptalks.LineString(
+      [
+        startOfRecordingLocation,
+        {{#each gpsTrace}}
+          [{{longitude}}, {{latitude}}],
+        {{/each}}
+        endOfRecordingLocation
+      ],
+      {
+        symbol:{
+          'lineColor' : '#1bbc9b',
+          'lineWidth' : 1,
+          'lineDasharray' : [10, 10],
+          'markerPlacement' : 'vertex', //vertex, point, vertex-first, vertex-last, center
+          'markerVerticalAlignment' : 'middle',
+          'markerWidth'  : 30,
+          'markerHeight' : 30
+        }
+      }
+    ).addTo(g_map.getLayer('trace'));
+
+    // Start of recording.
+    {
+      var geoJSON = `{
+  "type": "Feature",
+  "geometry": {
+    "type": "Point",
+    "coordinates": ` + JSON.stringify(startOfRecordingLocation) + `
+  },
+  "properties": {
+    "name": "Start of recording."
+  }
+  }
+`;
+      var marker = maptalks.GeoJSON.toGeometry(geoJSON).addTo(g_map.getLayer('trace'));
+      marker.setInfoWindow({
+        'content'   : 'Start of recording.',
+        'autoCloseOn' : 'click'
+      });
+    }
+    // End of recording.
+    {
+      var geoJSON = `{
+  "type": "Feature",
+  "geometry": {
+    "type": "Point",
+    "coordinates": ` + JSON.stringify(endOfRecordingLocation) + `
+  },
+  "properties": {
+    "name": "End of recording."
+  }
+  }
+`;
+      var marker = maptalks.GeoJSON.toGeometry(geoJSON).addTo(g_map.getLayer('trace'));
+      marker.setInfoWindow({
+        'content'   : 'End of recording.',
+        'autoCloseOn' : 'click'
+      });
+    }
+  }
+
+  {{#each gpsCommentsTrace}}
+    var geoJSON = `{
+"type": "Feature",
+"geometry": {
+  "type": "Point",
+  "coordinates": [{{position.longitude}},{{position.latitude}}]
+},
+"properties": {
+  "name": "{{comment}}"
+}
+}
+`;
+    var marker = maptalks.GeoJSON.toGeometry(geoJSON).addTo(g_map.getLayer('trace'));
+    marker.setInfoWindow({
+      'title': '{{timestamp}}',
+      'content' : '{{comment}}',
+      'autoCloseOn' : 'click'
+    });
+  {{/each}}
+</script>
+
+</body>
+</html>
+

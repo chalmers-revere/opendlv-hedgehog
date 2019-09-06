@@ -1,0 +1,450 @@
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+
+        <link type="text/css" rel="stylesheet" href="css/all.css"/>
+
+<style>
+    * {
+        font-family: Helvetica Neue, Helvetica, Arial, sans-serif;
+        font-size: 14px;
+        color: #aaa;
+    }
+    body {
+        overflow: hidden;
+        padding: 0;
+        margin: 0;
+        background-color: #444;
+    }
+    #info {
+        position: absolute;
+        top: 0px;
+        width: 100%;
+        padding: 5px;
+    }
+    #container {
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        padding: 0;
+        margin: 0;
+        -webkit-user-select: none;
+        -moz-user-select: none;
+    }
+
+    .onoffswitch {
+        position: relative; width: 116px;
+        -webkit-user-select:none; -moz-user-select:none; -ms-user-select: none;
+    }
+    .onoffswitch-checkbox {
+        display: none;
+    }
+    .onoffswitch-label {
+        display: block; overflow: hidden; cursor: pointer;
+        border: 2px solid #FFFFFF; border-radius: 50px;
+    }
+    .onoffswitch-inner {
+        display: block; width: 200%; margin-left: -100%;
+        transition: margin 0.3s ease-in 0s;
+    }
+    .onoffswitch-inner:before, .onoffswitch-inner:after {
+        display: block; float: left; width: 50%; height: 41px; padding: 0; line-height: 41px;
+        font-size: 25px; color: white; font-family: Trebuchet, Arial, sans-serif; font-weight: bold;
+        box-sizing: border-box;
+    }
+    .onoffswitch-inner:before {
+        content: "ON";
+        padding-right: 25px;
+        background-color: #EEEEEE; color: #34A7C1;
+    }
+    .onoffswitch-inner:after {
+        content: "OFF";
+        padding-right: 14px;
+        background-color: #EEEEEE; color: #999999;
+        text-align: right;
+    }
+    .onoffswitch-switch {
+        display: block; width: 38px; margin: 1.5px;
+        background: #A1A1A1;
+        position: absolute; top: 0; bottom: 0;
+        right: 71px;
+        border: 2px solid #FFFFFF; border-radius: 50px;
+        transition: all 0.3s ease-in 0s; 
+    }
+    .onoffswitch-checkbox:checked + .onoffswitch-label .onoffswitch-inner {
+        margin-left: 0;
+    }
+    .onoffswitch-checkbox:checked + .onoffswitch-label .onoffswitch-switch {
+        right: 0px; 
+        background-color: #34A7C1; 
+    }
+
+</style>
+</head>
+<body>
+
+<div id="container"></div>
+<div id="info">
+    <center>
+        <i id="connectionStatusSymbol" class="fa fa-taxi" style="font-size:30px;color:#555"></i>
+        <div id="connectionStatusText">disconnected</div>
+        <br>
+        <a href="https://upload.wikimedia.org/wikipedia/commons/8/8d/Gestures_Pan.png" target="_blank"> Pan to accelerate/decelerate and steer.</a>
+        <br><br>
+    <center>
+    <div class="onoffswitch">
+        <input type="checkbox" name="enableSending" class="onoffswitch-checkbox" id="enableSending" onclick="checkBoxToggled()">
+        <label class="onoffswitch-label" for="enableSending">
+            <span class="onoffswitch-inner"></span>
+            <span class="onoffswitch-switch"></span>
+        </label>
+    </div>
+    <br>
+    </center>
+
+    <button id="buttonParameters" type="button" class="fas fa-cog" style="font-size:20px;color:#555;padding: 5px 5px;" onclick="showParameters()" title="Configure parameters.">&nbsp; Parameters</button>
+    <br><br>
+
+    <div id="parameters">
+        <table>
+        <tr>
+            <td colspan=2>
+            <center>
+                <button id="parametersSnowfox" type="button" class="fas fa-car" style="font-size:20px;color:#3498DB;padding: 5px 5px;" onclick="setParametersForSnowfox()" title="Configure parameters for Snowfox.">&nbsp;Snowfox</button>
+                <button id="parametersRhino" type="button" class="fas fa-truck" style="font-size:20px;color:#555;padding: 5px 5px;" onclick="setParametersForRhino()" title="Configure parameters for Rhino.">&nbsp;Rhino</button>
+                <button id="parametersKiwi" type="button" class="fas fa-kiwi-bird" style="font-size:20px;color:#555;padding: 5px 5px;" onclick="setParametersForKiwi()" title="Configure parameters for Kiwi.">&nbsp;Kiwi</button>
+            <center>
+            </td>
+        </tr>
+        <tr>
+            <td>
+            Requested steering:
+            </td>
+            <td>
+            <span id="steering"></span>
+            </td>
+        </tr>
+        <tr>
+            <td>
+            Requested acceleration:
+            </td>
+            <td>
+            <span id="acceleration"></span>
+            </td>
+        </tr>
+        <tr>
+            <td>
+            Requested deceleration:
+            </td>
+            <td>
+            <span id="deceleration"></span>
+            </td>
+        </tr>
+        <tr>
+            <td>
+            Requested calibration steering:
+            </td>
+            <td>
+            <span id="steeringOffset"></span>
+            </td>
+        </tr>
+        <tr>
+            <td>
+            Minimum steering:
+            </td>
+            <td>
+            <input id="minSteering" name="minSteering" type="number" min=0 max=-45 value=0 />
+            </td>
+        </tr>
+        <tr>
+            <td>
+            Maximum steering:
+            </td>
+            <td>
+            <input id="maxSteering" name="maxSteering" type="number" min=0 max=45 value=38 />
+            </td>
+        </tr>
+        <tr>
+            <td>
+            Maximum acceleration:
+            </td>
+            <td>
+            <input id="maxAcceleration" name="maxAcceleration" type="number" min=0 max=100 value=25 />
+            </td>
+        </tr>
+        <tr>
+            <td>
+            Maximum deceleration:
+            </td>
+            <td>
+            <input id="maxDeceleration" name="maxDeceleration" type="number" min=0 max=100 value=100 />
+            </td>
+        </tr>
+        <tr>
+            <td>
+            Calibration:
+            </td>
+            <td>
+            <input id="enableCalibrationSteering" name="enableCalibrationSteering" type="checkbox" />
+            </td>
+        </tr>
+        <tr>
+            <td>
+            </td>
+            <td>
+            <input id="calibrationSteering" name="calibrationSteering" type="range" min=-0.4 max=0.4 step=0.001 value=0.000 />
+            </td>
+        </tr>
+        </table>
+        </center>
+    </div>
+</div>
+
+<script type="text/javascript" src="js/virtualjoystick.js"></script>
+<script type="text/javascript" src="js/libcluon-0.0.121.js"></script>
+
+<script>
+    var g_vehicle = "{{g_vehicle}}";
+
+    if ("Snowfox" == g_vehicle) {
+        setParametersForSnowfox();
+    }
+    else if ("Rhino" == g_vehicle) {
+        setParametersForRhino();
+    }
+    else if ("Kiwi" == g_vehicle) {
+        setParametersForKiwi();
+    }
+
+    function showParameters() {
+        var parameters = document.getElementById("parameters");
+        if (parameters.style.display === "none") {
+            parameters.style.display = "block";
+        } else {
+            parameters.style.display = "none";
+        }
+    }
+
+    function setParametersForSnowfox() {
+        g_vehicle = "Snowfox";
+        document.getElementById("parametersSnowfox").style.color = "#3498DB";
+        document.getElementById("parametersRhino").style.color = "#555";
+        document.getElementById("parametersKiwi").style.color = "#555";
+
+        document.getElementById("minSteering").value = -10;
+        document.getElementById("maxSteering").value = 10;
+        document.getElementById("maxAcceleration").value = 50;
+        document.getElementById("maxDeceleration").value = 10;
+    }
+
+    function setParametersForRhino() {
+        g_vehicle = "Rhino";
+        document.getElementById("parametersSnowfox").style.color = "#555";
+        document.getElementById("parametersRhino").style.color = "#3498DB";
+        document.getElementById("parametersKiwi").style.color = "#555";
+
+        document.getElementById("minSteering").value = -10;
+        document.getElementById("maxSteering").value = 10;
+        document.getElementById("maxAcceleration").value = 50;
+        document.getElementById("maxDeceleration").value = 10;
+    }
+
+    function setParametersForKiwi() {
+        g_vehicle = "Kiwi";
+        document.getElementById("parametersSnowfox").style.color = "#555";
+        document.getElementById("parametersRhino").style.color = "#555";
+        document.getElementById("parametersKiwi").style.color = "#3498DB";
+
+        document.getElementById("minSteering").value = 0;
+        document.getElementById("maxSteering").value = 38;
+        document.getElementById("maxAcceleration").value = 25;
+        document.getElementById("maxDeceleration").value = 100;
+    }
+
+    function getResourceFrom(url) {
+        var xmlHttp = new XMLHttpRequest();
+        xmlHttp.open("GET", url, false /*asynchronous request*/);
+        xmlHttp.send(null);
+        return xmlHttp.responseText;
+    }
+
+    var __libcluon = libcluon();
+    var ws;
+    if ("WebSocket" in window) {
+        document.getElementById("parameters").style.display = "none";
+        ws = new WebSocket("ws://" + window.location.host + "/", "od4");
+        ws.binaryType = 'arraybuffer';
+
+        ws.onopen = function() {
+            document.getElementById("connectionStatusSymbol").style.color = "#3CB371";
+            document.getElementById("connectionStatusText").style.color = "#3CB371";
+            document.getElementById("connectionStatusText").innerHTML = "connected";
+
+            var odvd = getResourceFrom("opendlv-standard-message-set-v0.9.9.odvd");
+            {
+                // Always add the messages to control the player.
+                var actuationRequestMessage = `
+
+// This message is a legacy one to support controlling Snowfox and Rhino.
+message opendlv.proxy.ActuationRequest [id = 160] {
+  float acceleration [id = 1];
+  float steering [id = 2];
+  bool isValid [id = 3];
+}
+`;
+                odvd += actuationRequestMessage;
+            }
+            console.log("Loaded " + __libcluon.setMessageSpecification(odvd) + " messages from specification.");
+        };
+
+        ws.onmessage = function(evt) {
+//            var data = JSON.parse(__libcluon.decodeEnvelopeToJSON(evt.data));
+//            console.log("Data: " + data);
+        }
+
+        ws.onclose = function() {
+            document.getElementById("connectionStatusText").style.color = "#aaa";
+            document.getElementById("connectionStatusSymbol").style.color = "#aaa";
+            document.getElementById("connectionStatusText").innerHTML = "disconnected";
+        };
+    }
+    else {
+        // The browser doesn't support WebSocket
+        console.log("WebSocket NOT supported by your Browser!");
+    }
+
+    function checkBoxToggled() {
+        if (document.getElementById("enableSending").checked) {
+            alert("Be careful! Always watch the vehicle's surroundings!");
+        }
+
+        if (!document.getElementById("enableSending").checked) {
+            var groundSteeringRequest = "{\"groundSteering\":0}";
+            var envGroundSteeringRequest = __libcluon.encodeEnvelopeFromJSONWithSampleTimeStamp(groundSteeringRequest, 1090 /* message identifier */, 0 /* sender stamp */);
+
+            var pedalPositionRequest = "{\"position\":0}";
+            var envPedalPositionRequest = __libcluon.encodeEnvelopeFromJSONWithSampleTimeStamp(pedalPositionRequest, 1086 /* message identifier */, 1 /* sender stamp */);
+
+            var actuationCommands = "{\"virtualjoystick\":" +
+                                        "{" +
+                                            "\"pedalPositionRequest\":" + "\"" + window.btoa(envPedalPositionRequest) + "\"," +
+                                            "\"groundSteeringRequest\":" + "\"" + window.btoa(envGroundSteeringRequest) + "\"" +
+                                        "}" +
+                                    "}";
+            ws.send(actuationCommands);
+        }
+
+    }
+
+    var joystick = new VirtualJoystick({
+        container: document.getElementById('container'),
+        mouseSupport: true,
+        strokeStyle: '#3498DB',
+        limitStickTravel: true,
+    });
+
+    setInterval(function(){
+        var envPedalPositionRequest;
+        var envGroundSteeringRequest;
+        var envCalibrationSteeringRequest;
+        var envActuationRequest;
+
+        // Support for PedalPositionRequest & GroundSteeringRequest.
+        {
+            var pedalPosition = Math.floor(((-1 * joystick.deltaY())/100.0)*100.0)/100.0;
+
+
+            var gasPedalPosition = Math.floor(((pedalPosition > 0) ? (pedalPosition*Number(document.getElementById("maxAcceleration").value)) : 0))/100.0;
+            var brakePedalPosition = Math.floor(((pedalPosition < 0) ? (pedalPosition*Number(document.getElementById("maxDeceleration").value)) : 0))/100.0;
+
+            var pedalPositionRequest = "{\"position\":" + (gasPedalPosition > 0 ? gasPedalPosition : brakePedalPosition) + "}";
+            envPedalPositionRequest = __libcluon.encodeEnvelopeFromJSONWithSampleTimeStamp(pedalPositionRequest, 1086 /* message identifier */, 0 /* sender stamp */);
+
+            var offsetSteering = Number(document.getElementById("calibrationSteering").value);
+            var groundOffsetSteeringRequest = "{\"groundSteering\":" + offsetSteering + "}";
+            envCalibrationSteeringRequest = __libcluon.encodeEnvelopeFromJSONWithSampleTimeStamp(groundOffsetSteeringRequest, 1090 /* message identifier */, 9999 /* sender stamp */);
+            
+            var steering = Math.floor((-1 * (joystick.deltaX()/100.0) * Number(document.getElementById("maxSteering").value) * Math.PI / 180.0)*100.0)/100.0;
+            var groundSteeringRequest = "{\"groundSteering\":" + steering + "}";
+            envGroundSteeringRequest = __libcluon.encodeEnvelopeFromJSONWithSampleTimeStamp(groundSteeringRequest, 1090 /* message identifier */, 0 /* sender stamp */);
+        }
+
+        // Support for legacy ActuationRequest.
+        {
+            // Map both axes to range [0..100].
+            var axisX = Math.floor((((Math.floor(((joystick.deltaX())/100.0)*100.0)/100.0)+1.0)/2.0)*100.0);
+            var axisY = Math.floor((((Math.floor(((-1 * joystick.deltaY())/100.0)*100.0)/100.0)+1.0)/2.0)*100.0);
+
+            var maxSteering = Number(document.getElementById("maxSteering").value);
+            var minSteering = Number(document.getElementById("minSteering").value);
+            var steering = Math.floor((axisX/100.0*(maxSteering-minSteering) + minSteering) * 4.0)/4.0;
+            if ("Snowfox" == g_vehicle) {
+                steering *= -1.0;
+            }
+            if ("Rhino" == g_vehicle) {
+                steering *= -1.0;
+            }
+
+            var maxAcceleration = Number(document.getElementById("maxAcceleration").value);
+            var maxDeceleration = Number(document.getElementById("maxDeceleration").value);
+            var acceleration = 0;
+            if (0 < -1.0*joystick.deltaY()) {
+                acceleration = -1.0 * (100.0 - 2*axisY)/100.0 * maxAcceleration;
+            }
+            else {
+                acceleration = -1.0 * (100.0 - 2*axisY)/100.0 * maxDeceleration;
+            }
+            acceleration = Math.floor(acceleration * 4.0)/4.0;
+
+            var actuationRequest = "{\"acceleration\":" + acceleration + ",\"steering\":" + steering + ",\"isValid\":" + true + "}";
+            envActuationRequest = __libcluon.encodeEnvelopeFromJSONWithSampleTimeStamp(actuationRequest, 160 /* message identifier */, 0 /* sender stamp */);
+
+//            strToAB = str =>
+//              new Uint8Array(str.split('')
+//                .map(c => c.charCodeAt(0))).buffer;
+
+// Instead of sending the raw bytes, we encapsulate them into a JSON object.
+//            ws.send(strToAB(output), { binary: true });
+        }
+
+        if (document.getElementById("enableCalibrationSteering").checked) {
+          var calibrationCommands = "{\"virtualjoystickCalibration\":" +
+                                      "{" +
+                                          "\"calibrationSteeringRequest\":" + "\"" + window.btoa(envCalibrationSteeringRequest) + "\"" +
+                                      "}" +
+                                    "}";
+          if (document.getElementById("enableSending").checked) {
+            ws.send(calibrationCommands);
+          }
+        }
+
+
+        var actuationCommands = "{\"virtualjoystick\":" +
+                                    "{" +
+                                        "\"pedalPositionRequest\":" + "\"" + window.btoa(envPedalPositionRequest) + "\"," +
+                                        "\"groundSteeringRequest\":" + "\"" + window.btoa(envGroundSteeringRequest) + "\"," +
+                                        "\"actuationRequest\":" + "\"" + window.btoa(envActuationRequest) + "\"" +
+                                    "}" +
+                                "}";
+
+        if (document.getElementById("enableSending").checked) {
+            ws.send(actuationCommands);
+        }
+
+        var steeringLabel = document.getElementById('steering');
+        steeringLabel.innerHTML = steering;
+
+        var accelerationLabel = document.getElementById('acceleration');
+        accelerationLabel.innerHTML = gasPedalPosition;
+
+        var decelerationLabel = document.getElementById('deceleration');
+        decelerationLabel.innerHTML = brakePedalPosition;
+
+        var steeringOffsetLabel = document.getElementById('steeringOffset');
+        steeringOffsetLabel.innerHTML = offsetSteering;
+
+    }, 1/25 /* 25Hz */ * 1000);
+</script>
+</body>
+</html>
